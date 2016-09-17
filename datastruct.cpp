@@ -10,6 +10,7 @@
 #include <openssl\md5.h>
 #include <openssl\rsa.h>
 #include <openssl\pem.h>
+#include <openssl/err.h>
 #include "datastruct.h"
 
 ///
@@ -203,7 +204,7 @@ QString getRandomNum(int len)
 /// \param src
 /// \return QString, md5
 ///
-QString getMd5(QString src)
+QString getMd5(const QString &src)
 {
     return QString("%1").arg(QString(QCryptographicHash::hash(src.toUtf8(),QCryptographicHash::Md5).toHex()));
 }
@@ -381,44 +382,135 @@ free_all:
 
     return (ret == 1);
 }
-int signKey(const QString priName,const QString passWord,const QString srcName)
+///
+/// \brief signKey
+/// \param priPath
+/// \param passWord
+/// \param srcPath
+/// \return
+/// -6
+/// -5
+/// -4
+/// -3
+/// -2
+/// -1
+/// 0
+///
+int signKey(const QString priPath,const QString passWord,const QString srcPath)
 {
-    RSA *rsa=NULL;
-    BIO *bpPrivate=NULL;
-    QString srcPath=QString("./key/private/");
     QDir srcDir(srcPath);
     if(!srcDir.exists())
-        srcDir.mkpath(desPath);
-    QFile srcFile(srcPath+srcName);
+        srcDir.mkpath(srcPath);
+    QFile srcFile(srcPath);
     if(!srcFile.exists())
         return -1;
-    srcFile.open(QIODevice::ReadOnly);
-    QString srckey=srcFile.readAll();
-    rsa=RSA_new();
-    bpPrivate = BIO_new(BIO_s_file());
-    if(BIO_read_filename(bpPrivate,priName.toStdString().c_str())!=1)
-    {
-        BIO_free(bpPrivate);
+    if(!srcFile.open(QIODevice::ReadOnly))
         return -2;
-    }
-    rsa=PEM_read_bio_RSAPrivateKey(bpPrivate,NULL,NULL,(void *)passWord.toStdString().c_str());
-    if(rsa==NULL)
+    QString srckey=srcFile.readAll();
+
+    RSA *rsa=NULL;
+    BIO *bpPrivate=NULL;
+    bpPrivate = BIO_new(BIO_s_file());
+    if(BIO_read_filename(bpPrivate,priPath.toStdString().c_str())!=1)
     {
         BIO_free(bpPrivate);
         return -3;
     }
+    rsa=RSA_new();
+    rsa=PEM_read_bio_RSAPrivateKey(bpPrivate,NULL,NULL,(void *)passWord.toStdString().c_str());
+    if(rsa==NULL)
+    {
+        RSA_free(rsa);
+        BIO_free(bpPrivate);
+        return -4;
+    }
     unsigned int len=RSA_size(rsa);
     unsigned char signText[len];
-    if(RSA_sign(NID_md5,(const unsigned char*)srckey.toStdString().c_str(),srckey.length(),signText,&len,rsa)!=1)
-        return -4;
-
-    QString dstPath("./signatures/");
-    QDir dstdir(dstPath);
-    if(!dir.exists())
-        dir.mkpath(desPath);
-
+    QString digest=getMd5(srckey);
+    if(RSA_sign(NID_md5,(const unsigned char*)digest.toStdString().c_str(),digest.length(),signText,&len,rsa)!=1)
+    {
+        qDebug()<<ERR_reason_error_string(ERR_get_error());
+        RSA_free(rsa);
+        BIO_free(bpPrivate);
+        return -5;
+    }
     RSA_free(rsa);
     BIO_free(bpPrivate);
+
+    QString dstPath("./key/signatures/");
+    QDir dstDir;
+    dstDir.mkpath(dstPath);
+    QFileInfo fileInfo(srcPath);
+    QString dstName=fileInfo.baseName()+".ds";
+    QFile signFile(dstPath+dstName);
+    if(!signFile.open(QIODevice::WriteOnly))
+        return -6;
+    QDataStream ds(&signFile);
+    ds.setVersion(QDataStream::Qt_5_7);
+    ds<<0x01<<101<<srckey<<digest<<len;
+    ds.writeBytes((char*)signText,len);
+    return 0;
+}
+///
+/// \brief verifySign
+/// \param priPath
+/// \param passWord
+/// \param srcPath
+/// \return
+///
+int verifySign(const QString pubPath,const QString passWord,const QString srcPath)
+{
+    QDir srcDir(srcPath);
+    if(!srcDir.exists())
+        srcDir.mkpath(srcPath);
+    QFile signFile(srcPath);
+    if(!signFile.exists())
+        return -1;
+    if(!signFile.open(QIODevice::ReadOnly))
+        return -2;
+    QDataStream ds(&signFile);
+    ds.setVersion(QDataStream::Qt_5_7);
+    qint32 magicNum;
+    qint32 version;
+    QString srckey;
+    QString digest;
+    int len;
+    ds>>magicNum;
+    if(magicNum!=0x01)
+        return -3;
+    ds>>version;
+    if(version!=101)
+        return -4;
+    ds>>srckey>>digest>>len;
+    char signText[len];
+    ds.readRawData(signText,len);
+
+    RSA *rsa=NULL;
+    BIO *bpPublic=NULL;
+    bpPublic = BIO_new(BIO_s_file());
+    if(BIO_read_filename(bpPublic,pubPath.toStdString().c_str())!=1)
+    {
+        BIO_free(bpPublic);
+        return -5;
+    }
+    rsa=RSA_new();
+    rsa=PEM_read_bio_RSAPublicKey(bpPublic,NULL,NULL,(void *)passWord.toStdString().c_str());
+    if(rsa==NULL)
+    {
+        qDebug()<<ERR_reason_error_string(ERR_get_error());
+        RSA_free(rsa);
+        BIO_free(bpPublic);
+        return -6;
+    }
+    if(RSA_verify(NID_md5,(const unsigned char*)digest.toStdString().c_str(),digest.length(),(const unsigned char*)signText,len,rsa)!=1)
+    {
+        qDebug()<<ERR_reason_error_string(ERR_get_error());
+        RSA_free(rsa);
+        BIO_free(bpPublic);
+        return -7;
+    }
+    RSA_free(rsa);
+    BIO_free(bpPublic);
     return 0;
 }
 /*
@@ -450,12 +542,15 @@ int testFunction(DataStruct &datas)
         qDebug()<<datas.accounts[0].userName<<datas.accounts[0].passWord;
         qDebug()<<datas.accounts[1].userName<<datas.accounts[1].passWord;
     }
+    qDebug()<<signKey("./key/private/private1.pem","aabaWW,aa2","./key/private/private2.pem");
+    qDebug()<<verifySign("./key/public/public1.pem","aabaWW,aa2","./key/signatures/private2.ds");
+    /*
+    if(!generateAndSaveKey("aabaWW,aa2",3))
+        return -1;
     qDebug()<<getRandomNum(16);
     qDebug()<<getMd5("Hello");
     qDebug()<<"isSecure:"<<endl<<getSecureLevel("admin1","aabaWW,aa2");
-    if(!generateAndSaveKey("aabaWW,aa2",2))
-        return -1;
-    /*if(writeAccounts(datas.accounts)<0)
+    if(writeAccounts(datas.accounts)<0)
         return -1;
     writeLog("This is a test log 1.");
     writeLog("This is a test log 2.");
