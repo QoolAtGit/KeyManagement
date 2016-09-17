@@ -2,6 +2,7 @@
 #define WIDGET_H
 
 #include <QWidget>
+#include "datastruct.h"
 
 namespace Ui {
 class Widget;
@@ -13,10 +14,32 @@ class Widget : public QWidget
 
 public:
     explicit Widget(QWidget *parent = 0);
+    void setDataStruct(QString passWord);
+    void displayAccounts();
     ~Widget();
+
+private slots:
+    void on_pushButton_clicked();
+
+    void on_spinBox_valueChanged(int arg1);
+
+    void on_pushButton_5_clicked();
+
+    void on_pushButton_4_clicked();
+
+    void on_lineEdit_5_textChanged(const QString &arg1);
+
+    void on_lineEdit_4_textChanged(const QString &arg1);
+
+    void on_pushButton_6_clicked();
+
+signals:
+    void switchTOAuth();
 
 private:
     Ui::Widget *ui;
+    DataStruct datas;
+    QString srcPath;
 };
 
 #endif // WIDGET_H

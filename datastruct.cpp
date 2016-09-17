@@ -12,6 +12,8 @@
 #include <openssl\pem.h>
 #include <openssl/err.h>
 #include "datastruct.h"
+#include "auth.h"
+#include "login.h"
 
 ///
 /// \brief readKeys
@@ -154,6 +156,7 @@ int writeLog(QString info)
 int loadAuth(QString &auth)
 {
     auth.clear();
+    QString auths;
     QFile file("auth.ds");
     if(file.exists()==false)
         return -2;
@@ -162,7 +165,7 @@ int loadAuth(QString &auth)
     QDataStream ds(&file);
     ds.setVersion(QDataStream::Qt_5_7);
     ds>>auth;
-    if(auth.isNull()||auth.isEmpty())
+    if(auth.isEmpty())
         return -2;
     file.close();
     return 0;
@@ -243,88 +246,28 @@ int getSecureLevel(const QString &userName,const QString &passWord)
         security+=1;
     if(passWord.length()>10)
         security+=1;
+    if(passWord.length()>11)
+        security+=1;
+    if(passWord.length()>12)
+        security+=1;
+    if(passWord.length()>13)
+        security+=1;
+    if(passWord.length()>14)
+        security+=1;
     if(passWord.length()>15)
+        security+=1;
+    if(passWord.length()>16)
+        security+=1;
+    if(passWord.length()>17)
+        security+=1;
+    if(passWord.length()>18)
+        security+=1;
+    if(passWord.length()>19)
         security+=1;
     if(passWord.length()>20)
         security+=1;
     return security;
 }
-
-/*void generateRsa(QString src,QString passWord)
-{
-    #define KEY_LENGTH  2048
-    #define PUB_EXP     3
-    size_t pri_len;            // Length of private key
-    size_t pub_len;            // Length of public key
-    char   *pri_key;           // Private key
-    char   *pub_key;           // Public key
-
-    OpenSSL_add_all_algorithms();
-
-    RSA *keypair = RSA_generate_key(KEY_LENGTH, PUB_EXP, NULL, NULL);
-
-    // To get the C-string PEM form:
-    BIO *pri = BIO_new(BIO_s_mem());
-    BIO *pub = BIO_new(BIO_s_mem());
-
-    PEM_write_bio_RSAPrivateKey(pri, keypair, NULL, NULL, 0, NULL, NULL);
-    PEM_write_bio_RSAPublicKey(pub, keypair);
-
-    priLen = BIO_pending(pri);
-    pub_len = BIO_pending(pub);
-
-    pri_key = (char*)malloc(pri_len + 1);//
-    pub_key = (char*)malloc(pub_len + 1);//
-
-    BIO_read(pri, pri_key, pri_len);
-    BIO_read(pub, pub_key, pub_len);
-
-    // Get the message to encrypt
-    printf("Message to encrypt: ");
-    fgets(msg, KEY_LENGTH - 1, stdin);
-    msg[strlen(msg) - 1] = '\0';
-
-    // Encrypt the message
-    encrypt = (char*)malloc(RSA_size(keypair));
-    int encrypt_len;
-    err = (char*)malloc(130);
-    if ((encrypt_len = RSA_public_encrypt(strlen(msg) + 1, (unsigned char*)msg, (unsigned char*)encrypt, keypair, RSA_PKCS1_OAEP_PADDING)) == -1) {
-        fprintf(stderr, "Error encrypting message: %s\n", err);
-        goto free_stuff;
-    }
-    printf("Encrypt message:");
-    for (int i = 0; i < sizeof(encrypt); i++)
-    {
-        printf("%02X", encrypt[i]);
-
-    }
-    cout << endl;
-    // Decrypt it
-    decrypt = (char*)malloc(encrypt_len);
-
-    if (RSA_private_decrypt(encrypt_len, (unsigned char*)encrypt, (unsigned char*)decrypt, keypair, RSA_PKCS1_OAEP_PADDING) == -1) {;
-        fprintf(stderr, "Error decrypting message: %s\n", err);
-        goto free_stuff;
-    }
-    printf("Decrypted message: %s\n", decrypt);
-
-
-
-    char   msg[KEY_LENGTH / 8];  // Message to encrypt
-    char   *encrypt = NULL;    // Encrypted message
-    char   *decrypt = NULL;    // Decrypted message
-    char   *err;               // Buffer for any error messages
-
-free_stuff:
-    RSA_free(keypair);
-    BIO_free_all(pub);
-    BIO_free_all(pri);
-    free(pri_key);
-    free(pub_key);
-    free(encrypt);
-    free(decrypt);
-    free(err);
-}*/
 ///
 /// \brief generateAndSaveKey
 /// \param passWord
@@ -388,19 +331,11 @@ free_all:
 /// \param passWord
 /// \param srcPath
 /// \return
-/// -6
-/// -5
-/// -4
-/// -3
-/// -2
-/// -1
-/// 0
+/// <0 error
+///  0 ok
 ///
 int signKey(const QString priPath,const QString passWord,const QString srcPath)
 {
-    QDir srcDir(srcPath);
-    if(!srcDir.exists())
-        srcDir.mkpath(srcPath);
     QFile srcFile(srcPath);
     if(!srcFile.exists())
         return -1;
@@ -447,7 +382,7 @@ int signKey(const QString priPath,const QString passWord,const QString srcPath)
         return -6;
     QDataStream ds(&signFile);
     ds.setVersion(QDataStream::Qt_5_7);
-    ds<<0x01<<101<<srckey<<digest<<len;
+    ds<<0x01<<101<<srckey<<len;
     ds.writeBytes((char*)signText,len);
     return 0;
 }
@@ -457,12 +392,11 @@ int signKey(const QString priPath,const QString passWord,const QString srcPath)
 /// \param passWord
 /// \param srcPath
 /// \return
+///  <0 error
+///   0 ok
 ///
 int verifySign(const QString pubPath,const QString passWord,const QString srcPath)
 {
-    QDir srcDir(srcPath);
-    if(!srcDir.exists())
-        srcDir.mkpath(srcPath);
     QFile signFile(srcPath);
     if(!signFile.exists())
         return -1;
@@ -473,17 +407,14 @@ int verifySign(const QString pubPath,const QString passWord,const QString srcPat
     qint32 magicNum;
     qint32 version;
     QString srckey;
-    QString digest;
-    int len;
+    unsigned int len;
     ds>>magicNum;
     if(magicNum!=0x01)
         return -3;
     ds>>version;
     if(version!=101)
         return -4;
-    ds>>srckey>>digest>>len;
-    char signText[len];
-    ds.readRawData(signText,len);
+    ds>>srckey>>len;
 
     RSA *rsa=NULL;
     BIO *bpPublic=NULL;
@@ -497,29 +428,26 @@ int verifySign(const QString pubPath,const QString passWord,const QString srcPat
     rsa=PEM_read_bio_RSAPublicKey(bpPublic,NULL,NULL,(void *)passWord.toStdString().c_str());
     if(rsa==NULL)
     {
-        qDebug()<<ERR_reason_error_string(ERR_get_error());
         RSA_free(rsa);
         BIO_free(bpPublic);
         return -6;
     }
+    QString digest=getMd5(srckey);
+    char *signText=new char[len];
+    ds.readBytes(signText,len);
     if(RSA_verify(NID_md5,(const unsigned char*)digest.toStdString().c_str(),digest.length(),(const unsigned char*)signText,len,rsa)!=1)
     {
         qDebug()<<ERR_reason_error_string(ERR_get_error());
         RSA_free(rsa);
         BIO_free(bpPublic);
+        delete []signText;
         return -7;
     }
+    delete []signText;
     RSA_free(rsa);
     BIO_free(bpPublic);
     return 0;
 }
-/*
-    int RSA_sign(int type, const unsigned char *m, unsigned int m_len,
-unsigned char *sigret, unsigned int *siglen, RSA *rsa);
-
-    int RSA_verify(int type, const unsigned char *m, unsigned int m_len,
-unsigned char *sigbuf, unsigned int siglen, RSA *rsa);
-*/
 ///
 /// \brief testFunction
 /// \param datas
@@ -527,7 +455,6 @@ unsigned char *sigbuf, unsigned int siglen, RSA *rsa);
 /// -2 account load error
 /// -1 account write error
 ///  0 normal
-///
 int testFunction(DataStruct &datas)
 {
     if(readAccounts(datas.accounts)<0)

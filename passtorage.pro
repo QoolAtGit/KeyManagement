@@ -14,12 +14,18 @@ TEMPLATE = app
 
 SOURCES += main.cpp\
         widget.cpp \
-    datastruct.cpp
+    datastruct.cpp \
+    auth.cpp \
+    login.cpp
 
 HEADERS  += widget.h \
-    datastruct.h
+    datastruct.h \
+    auth.h \
+    login.h
 
-FORMS    += widget.ui
+FORMS    += widget.ui \
+    auth.ui \
+    login.ui
 
 INCLUDEPATH = G:/Code/LIBS/OpenSSL/include
 
