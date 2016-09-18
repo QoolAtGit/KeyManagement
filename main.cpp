@@ -16,7 +16,11 @@ int main(int argc, char *argv[])
     QObject::connect(&loginWindow,&Login::switchToWidget,&w,&Widget::show);
     QObject::connect(&loginWindow,&Login::sendPassWord,&w,&Widget::setDataStruct);
     QObject::connect(&w,&Widget::switchTOAuth,&authWin,&Auth::show);
-    authWin.show();
+    QString passWord;
+    if(loadAuth(passWord)<0)
+        authWin.show();
+    else
+        loginWindow.show();
 
     return a.exec();
 }

@@ -16,6 +16,7 @@ public:
     explicit Widget(QWidget *parent = 0);
     void setDataStruct(QString passWord);
     void displayAccounts();
+    void displayKeys();
     ~Widget();
 
 private slots:
@@ -32,6 +33,8 @@ private slots:
     void on_lineEdit_4_textChanged(const QString &arg1);
 
     void on_pushButton_6_clicked();
+
+    void on_pushButton_3_clicked();
 
 signals:
     void switchTOAuth();

@@ -1,5 +1,7 @@
 #include <QTime>
 #include <QFile>
+#include <QTime>
+#include <QDebug>
 #include <QFileDialog>
 #include "widget.h"
 #include "ui_widget.h"
@@ -17,6 +19,7 @@ Widget::Widget(QWidget *parent) :
         ui->textBrowser->append(timer+"文件读取失败1");
     }
     displayAccounts();
+    displayKeys();
 }
 
 Widget::~Widget()
@@ -56,6 +59,23 @@ void Widget::displayAccounts()
         ui->tableWidget_3->setItem(currentRow,1,num1);
     }
     ui->tableWidget_3->show();
+    return;
+}
+
+void Widget::displayKeys()
+{
+    QDir priDir("./key/private/");
+    QDir pubDir("./key/public/");
+    QStringList filters;
+    filters << "*.pem";
+    priDir.setNameFilters(filters);
+    pubDir.setNameFilters(filters);
+    QStringList fileList=priDir.entryList()+pubDir.entryList();
+    QStringList::const_iterator i;
+    for(i=fileList.constBegin();i!=fileList.constEnd();++i)
+    {
+        qDebug()<<(*i).toLocal8Bit().constData();
+    }
     return;
 }
 
@@ -163,4 +183,24 @@ void Widget::on_pushButton_6_clicked()
     ui->textBrowser->append(timer+"添加成功");
     ui->tableWidget_3->clear();
     displayAccounts();
+    return;
+}
+
+void Widget::on_pushButton_3_clicked()
+{
+    QString timer="["+QTime::currentTime().toString()+"] ";
+    ui->textBrowser->append(timer+"生成非对称密钥");
+    QString serNum=getRandomNum(6);
+    if(generateAndSaveKey(getMd5(datas.enterKey),serNum.toInt())==false)
+    {
+        ui->label_4->setText("发生错误，生成失败");
+        ui->textBrowser->append(timer+"发生错误，生成失败");
+    }
+    ui->textBrowser->append(timer+"生成非对称密钥成功");
+    ui->textBrowser->append(timer+"密钥路径为：");
+    ui->textBrowser->append(timer+QDir::currentPath());
+    //todo append to datas
+    //todo display
+    return;
+
 }

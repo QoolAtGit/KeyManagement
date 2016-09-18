@@ -41,21 +41,24 @@ void Auth::on_spinBox_valueChanged(int arg1)
 
 void Auth::on_pushButton_3_clicked()
 {
-    QString inputStr=ui->lineEdit_2->text();
-    if(inputStr=="密钥的密码（默认为空）")
-        inputStr.clear();
-    if(generateAndSaveKey(inputStr,getRandomNum(6).toInt()))
+    QString serNum=getRandomNum(6);
+    if(generateAndSaveKey("",serNum.toInt()))
     {
+        QString info="序列号为："+serNum;
         QString timer="["+QTime::currentTime().toString()+"] ";
-        QString info="私钥密码为："+inputStr;
         ui->textBrowser->append(timer+"生成非对称密钥");
         ui->textBrowser->append(timer+info);
         writeLog("生成对称密钥");
         QString path=QDir::currentPath()+"/key/";
         QDesktopServices::openUrl(QUrl(path, QUrl::TolerantMode));
+        ui->lineEdit_2->setText(path+"private"+serNum+".pem");
     }
     else
+    {
         ui->lineEdit_2->setText("发生错误");
+        QString timer="["+QTime::currentTime().toString()+"] ";
+        ui->textBrowser->append(timer+"发生错误，生成失败");
+    }
 }
 
 void Auth::on_pushButton_2_clicked()

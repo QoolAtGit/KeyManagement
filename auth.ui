@@ -138,10 +138,13 @@
              <string/>
             </property>
             <property name="text">
-             <string>密钥的密码（默认为空）</string>
+             <string>密钥路径</string>
             </property>
             <property name="alignment">
              <set>Qt::AlignCenter</set>
+            </property>
+            <property name="readOnly">
+             <bool>true</bool>
             </property>
            </widget>
           </item>
